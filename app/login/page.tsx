@@ -9,9 +9,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     <main className="login">
       <form action={login}>
         <h1>Talks</h1>
-        <input type="password" name="password" placeholder="Password" autoFocus required />
-        {error ? <p className="error">Wrong password.</p> : null}
-        <button type="submit">Log in</button>
+        <input type="password" name="password" placeholder="Password" className="input" autoFocus required />
+        {error ? <p className="sm alert">That password is not right.</p> : null}
+        <button type="submit" className="button primary">
+          Log in
+        </button>
       </form>
     </main>
   );

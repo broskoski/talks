@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { areal } from "./fonts";
+import { themeCss } from "@/lib/theme";
 import "./globals.css";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Talks",
@@ -12,7 +10,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" className={areal.variable}>
+      <head>
+        {/* Are.na design tokens as CSS variables, inlined so they exist before first paint. */}
+        <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+      </head>
       <body>{children}</body>
     </html>
   );

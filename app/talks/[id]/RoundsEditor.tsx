@@ -61,41 +61,43 @@ export function RoundsEditor({
   }
 
   return (
-    <div className="stack">
+    <div>
       {rounds.map((round, ri) => (
         <div className="round" key={ri}>
-          <span className="label">Round {ri + 1}</span>
+          <span className="round-label">Round {ri + 1}</span>
           {round.map((value, si) => (
-            <select key={si} value={value} onChange={(e) => update(ri, si, Number(e.target.value))}>
+            <select key={si} value={value} className="select" onChange={(e) => update(ri, si, Number(e.target.value))}>
               <option value={0}>{si < 2 ? "— choose —" : "— none —"}</option>
               {topics.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.title} (cost {t.cost}, {t.blockCount} blocks)
+                  {t.title} ({t.minutes} min, {t.blockCount} blocks)
                 </option>
               ))}
             </select>
           ))}
-          <button type="button" className="secondary" onClick={() => move(ri, -1)} disabled={ri === 0}>
-            ↑
-          </button>
-          <button type="button" className="secondary" onClick={() => move(ri, 1)} disabled={ri === rounds.length - 1}>
-            ↓
-          </button>
-          <button type="button" className="danger" onClick={() => remove(ri)}>
-            Remove
-          </button>
+          <div className="actions">
+            <button type="button" className="button sm" onClick={() => move(ri, -1)} disabled={ri === 0} aria-label="Move up">
+              Up
+            </button>
+            <button type="button" className="button sm" onClick={() => move(ri, 1)} disabled={ri === rounds.length - 1} aria-label="Move down">
+              Down
+            </button>
+            <button type="button" className="button sm alert" onClick={() => remove(ri)}>
+              Remove
+            </button>
+          </div>
         </div>
       ))}
-      <div className="row">
-        <button type="button" className="secondary" onClick={add}>
+      <div className="row" style={{ marginTop: "var(--space-2)" }}>
+        <button type="button" className="button ghost" onClick={add}>
           Add round
         </button>
-        <button type="button" onClick={save} disabled={pending}>
-          {pending ? "Saving…" : "Save rounds"}
+        <button type="button" className="button primary" onClick={save} disabled={pending}>
+          {pending ? "Saving" : "Save rounds"}
         </button>
-        {message ? <span className={message === "Saved." ? "muted" : "error"}>{message}</span> : null}
+        {message ? <span className={message === "Saved." ? "sm slate" : "sm alert"}>{message}</span> : null}
       </div>
-      <p className="muted">Each round needs 2 or 3 topics. Saving rounds clears picks that no longer fit.</p>
+      <p className="note">Each round offers 2 or 3 topics. Saving clears any picks that no longer fit the rounds.</p>
     </div>
   );
 }

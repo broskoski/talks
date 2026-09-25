@@ -30,8 +30,10 @@ export type ArenaBlock = {
   base_type: "Block";
   type: "Text" | "Image" | "Link" | "Attachment" | "Embed" | "PendingBlock";
   title: string | null;
+  metadata?: Metadata | null;
   image?: { small: ImageVersion; medium: ImageVersion; square: ImageVersion; large: ImageVersion } | null;
-  connection?: { position?: number } | null;
+  /** Present when the block came from a channel's contents. */
+  connection?: { id: number; position?: number } | null;
 };
 
 type Paginated<T> = {
@@ -208,6 +210,23 @@ export function connectBlock(blockId: number, channelId: number): Promise<void> 
       channel_ids: [channelId],
     }),
   }).then(() => undefined);
+}
+
+/** Create a text block from markdown and connect it to one channel. Appends to the end. */
+export function createTextBlock(input: { markdown: string; channelId: number; metadata?: Metadata }): Promise<ArenaBlock> {
+  return arenaFetch<ArenaBlock>("/blocks", {
+    method: "POST",
+    body: JSON.stringify({
+      value: input.markdown,
+      channel_ids: [input.channelId],
+      metadata: input.metadata,
+    }),
+  });
+}
+
+/** Remove a block from a channel by its connection id. The block itself is kept. */
+export function deleteConnection(connectionId: number): Promise<void> {
+  return arenaFetch<void>(`/connections/${connectionId}`, { method: "DELETE" });
 }
 
 /** Public web URL of a channel. */

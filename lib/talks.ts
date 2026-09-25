@@ -10,7 +10,8 @@ export type Talk = {
   slug: string;
   title: string;
   ownerSlug: string;
-  budget: number;
+  /** Length of the talk in whole minutes. */
+  minutes: number;
   /** Each round is a list of 2 or 3 topic channel ids. */
   rounds: number[][];
   /** Picked topic channel ids, in pick order. One per round. */
@@ -26,14 +27,31 @@ export type Topic = {
   title: string;
   ownerSlug: string;
   description: string;
-  cost: number;
+  /** How long this topic takes to present, in whole minutes. */
+  minutes: number;
+  /** True when minutes were set on the channel, false when estimated from the block count. */
+  minutesSet: boolean;
   blockCount: number;
 };
 
-export const DEFAULT_COST = 1;
+/** Rough presenting time when a topic has no minutes set: 20 seconds a block, at least 1 minute. */
+export function estimateMinutes(blockCount: number): number {
+  return Math.max(1, Math.ceil(blockCount / 3));
+}
 
 export function isTalkChannel(channel: ArenaChannel): boolean {
   return channel.metadata?.talk === true;
+}
+
+/** Talk channels are titled "** Name" on Are.na so they stand out in the group. The app shows just the name. */
+export const TALK_PREFIX = "** ";
+
+export function channelTitleFor(name: string): string {
+  return TALK_PREFIX + talkNameFrom(name);
+}
+
+export function talkNameFrom(channelTitle: string): string {
+  return channelTitle.startsWith(TALK_PREFIX) ? channelTitle.slice(TALK_PREFIX.length).trim() : channelTitle.trim();
 }
 
 function parseIdArray(value: unknown): number[] {
@@ -69,9 +87,9 @@ export function parseTalk(channel: ArenaChannel): Talk | null {
   return {
     id: channel.id,
     slug: channel.slug,
-    title: channel.title,
+    title: talkNameFrom(channel.title),
     ownerSlug: channel.owner.slug,
-    budget: Math.max(0, Number(m.budget) || 0),
+    minutes: Math.max(0, Math.round(Number(m.minutes) || 0)),
     rounds: parseRounds(m.rounds),
     picks: parseIdArray(m.picks),
     status: parseStatus(m.status),
@@ -81,14 +99,16 @@ export function parseTalk(channel: ArenaChannel): Talk | null {
 }
 
 export function parseTopic(channel: ArenaChannel): Topic {
-  const raw = Number(channel.metadata?.cost);
+  const raw = Number(channel.metadata?.minutes);
+  const minutesSet = channel.metadata?.minutes != null && Number.isFinite(raw) && raw >= 0;
   return {
     id: channel.id,
     slug: channel.slug,
     title: channel.title,
     ownerSlug: channel.owner.slug,
     description: channel.description?.plain ?? "",
-    cost: Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_COST,
+    minutes: minutesSet ? Math.round(raw) : estimateMinutes(channel.counts.blocks),
+    minutesSet,
     blockCount: channel.counts.blocks,
   };
 }
@@ -113,10 +133,10 @@ export function serializePicks(picks: number[]): string {
   return JSON.stringify(picks);
 }
 
-export function newTalkMetadata(budget: number): Metadata {
+export function newTalkMetadata(minutes: number): Metadata {
   return {
     talk: true,
-    budget,
+    minutes,
     rounds: serializeRounds([]),
     picks: serializePicks([]),
     status: "draft",
@@ -131,66 +151,75 @@ export function topicMap(topics: Topic[]): TopicMap {
   return new Map(topics.map((t) => [t.id, t]));
 }
 
-export function costOf(topics: TopicMap, id: number): number {
-  return topics.get(id)?.cost ?? DEFAULT_COST;
+export function minutesOf(topics: TopicMap, id: number): number {
+  return topics.get(id)?.minutes ?? estimateMinutes(0);
 }
 
-export function spent(picks: number[], topics: TopicMap): number {
-  return picks.reduce((sum, id) => sum + costOf(topics, id), 0);
+export function minutesSpent(picks: number[], topics: TopicMap): number {
+  return picks.reduce((sum, id) => sum + minutesOf(topics, id), 0);
 }
 
-export function remainingBudget(talk: Pick<Talk, "budget">, picks: number[], topics: TopicMap): number {
-  return talk.budget - spent(picks, topics);
+export function minutesLeft(talk: Pick<Talk, "minutes">, picks: number[], topics: TopicMap): number {
+  return talk.minutes - minutesSpent(picks, topics);
 }
 
 export type Candidate = {
   topic: Topic;
-  /** False when the topic does not fit the remaining budget or was already picked. */
+  /** False when the topic does not fit the remaining time or was already picked. */
   available: boolean;
-  reason: "ok" | "over_budget" | "already_picked" | "missing";
+  reason: "ok" | "over_time" | "already_picked" | "missing";
 };
 
 export function candidatesFor(
-  talk: Pick<Talk, "budget" | "rounds">,
+  talk: Pick<Talk, "minutes" | "rounds">,
   picks: number[],
   topics: TopicMap,
 ): Candidate[] {
   const round = talk.rounds[picks.length];
   if (!round) return [];
-  const remaining = remainingBudget(talk, picks, topics);
+  const remaining = minutesLeft(talk, picks, topics);
   return round.map((id) => {
     const topic = topics.get(id);
     if (!topic) {
       return {
-        topic: { id, slug: "", title: `Missing channel ${id}`, ownerSlug: "", description: "", cost: 0, blockCount: 0 },
+        topic: {
+          id,
+          slug: "",
+          title: `Missing channel ${id}`,
+          ownerSlug: "",
+          description: "",
+          minutes: 0,
+          minutesSet: false,
+          blockCount: 0,
+        },
         available: false,
         reason: "missing",
       };
     }
     if (picks.includes(id)) return { topic, available: false, reason: "already_picked" };
-    if (topic.cost > remaining) return { topic, available: false, reason: "over_budget" };
+    if (topic.minutes > remaining) return { topic, available: false, reason: "over_time" };
     return { topic, available: true, reason: "ok" };
   });
 }
 
-/** The talk is over at the last round, or when nothing in the current round fits. */
-export function isFinished(talk: Pick<Talk, "budget" | "rounds">, picks: number[], topics: TopicMap): boolean {
+/** The talk is over at the last round, or when nothing in the current round fits the time left. */
+export function isFinished(talk: Pick<Talk, "minutes" | "rounds">, picks: number[], topics: TopicMap): boolean {
   if (picks.length >= talk.rounds.length) return true;
   return !candidatesFor(talk, picks, topics).some((c) => c.available);
 }
 
-/** Validate a proposed pick list against the rounds and budget. Returns an error message or null. */
-export function validatePicks(talk: Pick<Talk, "budget" | "rounds">, picks: number[], topics: TopicMap): string | null {
+/** Validate a proposed pick list against the rounds and length. Returns an error message or null. */
+export function validatePicks(talk: Pick<Talk, "minutes" | "rounds">, picks: number[], topics: TopicMap): string | null {
   if (picks.length > talk.rounds.length) return "More picks than rounds";
   const seen = new Set<number>();
-  let remaining = talk.budget;
+  let remaining = talk.minutes;
   for (let i = 0; i < picks.length; i++) {
     const id = picks[i];
     if (!talk.rounds[i].includes(id)) return `Pick ${i + 1} is not in round ${i + 1}`;
     if (seen.has(id)) return `Channel ${id} picked twice`;
     seen.add(id);
-    remaining -= costOf(topics, id);
-    if (remaining < 0) return `Pick ${i + 1} exceeds the budget`;
+    remaining -= minutesOf(topics, id);
+    if (remaining < 0) return `Pick ${i + 1} runs over the talk length`;
   }
   return null;
 }

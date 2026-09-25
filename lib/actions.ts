@@ -11,6 +11,7 @@ import { env } from "./env";
 import { SESSION_COOKIE, createSessionToken, sessionCookieOptions } from "./session";
 import {
   candidatesFor,
+  channelTitleFor,
   newTalkMetadata,
   parseTalk,
   serializePicks,
@@ -67,10 +68,10 @@ function revalidateTalk(id: number) {
 export async function createTalk(formData: FormData): Promise<void> {
   await requireAuth();
   const title = String(formData.get("title") ?? "").trim();
-  const budget = num(formData.get("budget"));
+  const minutes = Math.round(num(formData.get("minutes")));
   if (!title) throw new Error("A talk needs a name");
-  if (!(budget >= 0)) throw new Error("Budget must be a number");
-  const channel = await createChannel({ title, metadata: newTalkMetadata(budget) });
+  if (!(minutes >= 0)) throw new Error("Length must be a number of minutes");
+  const channel = await createChannel({ title: channelTitleFor(title), metadata: newTalkMetadata(minutes) });
   revalidatePath("/");
   redirect(`/talks/${channel.id}`);
 }
@@ -79,13 +80,13 @@ export async function updateTalk(formData: FormData): Promise<void> {
   await requireAuth();
   const id = num(formData.get("talkId"));
   const title = String(formData.get("title") ?? "").trim();
-  const budget = num(formData.get("budget"));
+  const minutes = Math.round(num(formData.get("minutes")));
   const status = String(formData.get("status") ?? "draft") as TalkStatus;
   if (!title) throw new Error("A talk needs a name");
-  if (!(budget >= 0)) throw new Error("Budget must be a number");
+  if (!(minutes >= 0)) throw new Error("Length must be a number of minutes");
   if (!["draft", "live", "built"].includes(status)) throw new Error("Bad status");
   await loadTalkStrict(id);
-  await updateChannel(id, { title, metadata: { budget, status } });
+  await updateChannel(id, { title: channelTitleFor(title), metadata: { minutes, status } });
   revalidateTalk(id);
 }
 
@@ -131,14 +132,16 @@ export async function deleteTalk(formData: FormData): Promise<void> {
 
 // --- Topics -----------------------------------------------------------------
 
-export async function setCost(formData: FormData): Promise<void> {
+/** Set a topic's minutes. An empty value clears the override so the estimate from block count applies. */
+export async function setMinutes(formData: FormData): Promise<void> {
   await requireAuth();
   const id = num(formData.get("channelId"));
-  const cost = num(formData.get("cost"));
-  if (!(cost >= 0)) throw new Error("Cost must be a number");
+  const raw = String(formData.get("minutes") ?? "").trim();
+  const minutes = raw === "" ? null : Math.round(num(raw));
+  if (minutes !== null && !(minutes >= 0)) throw new Error("Minutes must be a number");
   const channel = await getChannel(id);
   if (parseTalk(channel)) throw new Error("That channel is a talk, not a topic");
-  await updateChannel(id, { metadata: { cost } });
+  await updateChannel(id, { metadata: { minutes } });
   revalidatePath("/topics");
   revalidatePath("/");
 }

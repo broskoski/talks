@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
+import { LinkRow } from "@/components/LinkRow";
 import { createTalk } from "@/lib/actions";
 import { requireAuthOrRedirect } from "@/lib/auth";
 import { loadTalksAndTopics } from "@/lib/data";
-import { topicMap, spent } from "@/lib/talks";
+import { topicMap, minutesSpent } from "@/lib/talks";
 
 export default async function TalksPage() {
   await requireAuthOrRedirect();
@@ -11,43 +12,44 @@ export default async function TalksPage() {
   const map = topicMap(topics);
 
   return (
-    <AdminShell>
+    <AdminShell crumbs={[{ label: "Talks" }]}>
       <section className="section">
-        <h1>Talks</h1>
         {talks.length === 0 ? (
-          <p className="muted">No talks yet.</p>
+          <p className="slate">No talks yet. Create one below.</p>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Name</th>
+                <th>Talk</th>
                 <th>Status</th>
-                <th className="num">Budget</th>
+                <th className="num">Minutes</th>
+                <th className="num">Length</th>
                 <th className="num">Rounds</th>
-                <th className="num">Picks</th>
                 <th className="num">Blocks</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {talks.map((talk) => (
-                <tr key={talk.id}>
-                  <td>
+                <LinkRow key={talk.id} href={`/talks/${talk.id}`}>
+                  <td className="primary">
                     <Link href={`/talks/${talk.id}`}>{talk.title}</Link>
                   </td>
                   <td>
-                    <span className={`status ${talk.status}`}>{talk.status}</span>
+                    <span className={`badge ${talk.status}`}>{talk.status}</span>
                   </td>
+                  <td className="num">{minutesSpent(talk.picks, map)}</td>
+                  <td className="num">{talk.minutes} min</td>
                   <td className="num">
-                    {spent(talk.picks, map)} / {talk.budget}
+                    {talk.picks.length} / {talk.rounds.length}
                   </td>
-                  <td className="num">{talk.rounds.length}</td>
-                  <td className="num">{talk.picks.length}</td>
                   <td className="num">{talk.blockCount}</td>
-                  <td>
-                    <Link href={`/talks/${talk.id}/stage`}>Stage →</Link>
+                  <td className="num">
+                    <Link href={`/talks/${talk.id}/stage`} className="button sm">
+                      Stage
+                    </Link>
                   </td>
-                </tr>
+                </LinkRow>
               ))}
             </tbody>
           </table>
@@ -55,16 +57,18 @@ export default async function TalksPage() {
       </section>
 
       <section className="section">
-        <h2>New talk</h2>
+        <h2 className="section-header">New talk</h2>
         <form action={createTalk} className="row">
-          <input type="text" name="title" placeholder="Talk name" required />
+          <input type="text" name="title" placeholder="Talk name" className="input" required />
           <label className="row">
-            Budget
-            <input type="number" name="budget" min={0} step="any" defaultValue={10} required />
+            <input type="number" name="minutes" min={0} step={1} defaultValue={40} className="input short" aria-label="Length in minutes" required />
+            <span className="sm slate">minutes</span>
           </label>
-          <button type="submit">Create</button>
+          <button type="submit" className="button primary">
+            Create talk
+          </button>
         </form>
-        <p className="muted">Creates a private channel in the group. Building the talk fills that channel.</p>
+        <p className="note">Creates a private channel in the group. Building the talk fills that channel.</p>
       </section>
     </AdminShell>
   );

@@ -2,15 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pick as pickAction, undo as undoAction, type PickResult } from "@/lib/actions";
-import {
-  candidatesFor,
-  isFinished,
-  remainingBudget,
-  spent,
-  topicMap,
-  type Talk,
-  type Topic,
-} from "@/lib/talks";
+import { candidatesFor, isFinished, minutesLeft, minutesSpent, topicMap, type Talk, type Topic } from "@/lib/talks";
 
 type BuildState =
   | { phase: "idle" }
@@ -59,8 +51,8 @@ export function Stage({
 
   const candidates = candidatesFor(talk, picks, map);
   const finished = isFinished(talk, picks, map);
-  const remaining = remainingBudget(talk, picks, map);
-  const used = spent(picks, map);
+  const remaining = Math.max(0, minutesLeft(talk, picks, map));
+  const used = minutesSpent(picks, map);
   const building = build.phase === "running" || build.phase === "finished";
 
   const doPick = useCallback(
@@ -114,31 +106,40 @@ export function Stage({
   }
 
   const roundNumber = Math.min(picks.length + 1, talk.rounds.length);
+  const fraction = talk.minutes > 0 ? Math.min(1, used / talk.minutes) : 0;
 
   return (
-    <main className="stage">
-      <header className="top">
-        <div className="title">{talk.title}</div>
-        <div className="round-count">
-          {finished ? "Done" : `Round ${roundNumber} of ${talk.rounds.length}`}
+    <main className="stage theme-dark">
+      <header className="stage-top">
+        <div className="crumbs">
+          <span className="current">{talk.title}</span>
+          <span className="sep" />
+          <span className="sub">{finished ? "Done" : `Round ${roundNumber} of ${talk.rounds.length}`}</span>
+        </div>
+        <span className="spacer" />
+        <div className="figures">
+          <span>
+            <b>{used} min</b> used
+          </span>
+          <span>
+            <b>{remaining} min</b> left
+          </span>
+          <span>
+            <b>{talk.minutes} min</b> talk
+          </span>
         </div>
       </header>
 
-      <div className="budget">
-        <div className="bar">
-          <div className="used" style={{ width: `${talk.budget > 0 ? Math.min(100, (used / talk.budget) * 100) : 0}%` }} />
-        </div>
-        <div className="numbers">
-          <span>Spent {used}</span>
-          <span>Budget {talk.budget}</span>
-          <span>Left {remaining}</span>
-        </div>
+      <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={talk.minutes} aria-valuenow={used}>
+        <div style={{ transform: `scaleX(${fraction})` }} />
       </div>
 
-      {picks.length > 0 ? (
+      {picks.length > 0 && !finished ? (
         <div className="picked">
           {picks.map((id, i) => (
-            <span key={i}>{map.get(id)?.title ?? id}</span>
+            <span key={i} className="badge outline">
+              {map.get(id)?.title ?? id}
+            </span>
           ))}
         </div>
       ) : null}
@@ -149,66 +150,83 @@ export function Stage({
             <button
               key={`${picks.length}-${c.topic.id}`}
               type="button"
-              className="card"
+              className="channel"
               disabled={!c.available}
               onClick={() => doPick(i)}
             >
-              <div className="key">{i + 1}</div>
-              <div className="name">{c.topic.title}</div>
-              <div className="desc">{c.topic.description}</div>
+              <span className="badge key">{i + 1}</span>
+              <span className="name">{c.topic.title}</span>
+              {c.topic.description ? <span className="subtitle">{c.topic.description}</span> : null}
+              <span className="meta">
+                <b>{c.topic.minutes} min</b>
+                {c.topic.blockCount} blocks
+              </span>
               {thumbs[c.topic.id]?.length ? (
-                <div className="thumbs">
+                <span className="thumbs">
                   {thumbs[c.topic.id].map((src) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={src} src={src} alt="" />
                   ))}
-                </div>
+                </span>
               ) : null}
-              <div className="meta">
-                <span>Cost {c.topic.cost}</span>
-                <span>{c.topic.blockCount} blocks</span>
-              </div>
             </button>
           ))}
         </div>
       ) : (
         <div className="summary">
           {picks.length === 0 ? (
-            <p>Nothing fits the budget. Check the rounds and costs.</p>
+            <p>Nothing fits the time left. Check the rounds and minutes in the admin.</p>
           ) : (
-            <ol>
-              {picks.map((id, i) => (
-                <li key={i}>
-                  {map.get(id)?.title ?? id} <span style={{ opacity: 0.6 }}>· cost {map.get(id)?.cost ?? 1}</span>
-                </li>
-              ))}
-            </ol>
+            <table>
+              <tbody>
+                {picks.map((id, i) => (
+                  <tr key={i}>
+                    <td className="num slate" style={{ width: "2.5em" }}>
+                      {i + 1}
+                    </td>
+                    <td>
+                      <b>{map.get(id)?.title ?? id}</b>
+                      {map.get(id)?.description ? <span className="subtitle">{map.get(id)?.description}</span> : null}
+                    </td>
+                    <td className="num slate">{map.get(id)?.minutes ?? "?"} min</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
+          {picks.length > 0 ? (
+            <p className="slate num">
+              {used} of {talk.minutes} minutes.
+            </p>
+          ) : null}
 
           {build.phase === "idle" && picks.length > 0 ? (
-            <button type="button" className="big" onClick={runBuild} disabled={inFlight > 0}>
-              {inFlight > 0 ? "Saving…" : "Build the talk"}
+            <button type="button" className="button primary" onClick={runBuild} disabled={inFlight > 0}>
+              {inFlight > 0 ? "Saving" : "Build the talk"}
             </button>
           ) : null}
           {build.phase === "running" ? (
-            <div className="progress">
-              Connecting blocks… {build.done} / {build.total || "?"}
+            <div className="stack">
+              <div className="progress">
+                <div style={{ transform: `scaleX(${build.total ? build.done / build.total : 0})` }} />
+              </div>
+              <div className="status num">
+                Connecting blocks, {build.done} of {build.total || "?"}
+              </div>
             </div>
           ) : null}
           {build.phase === "finished" ? (
-            <div className="progress">
-              Built. {build.total} blocks.{" "}
+            <div className="status">
+              Built with {build.total} blocks.{" "}
               <a href={build.channelUrl} target="_blank" rel="noreferrer">
-                Open the channel ↗
+                Open the channel
               </a>
             </div>
           ) : null}
           {build.phase === "error" ? (
             <div className="stack">
-              <div className="progress" style={{ color: "#ffcc00" }}>
-                {build.message}
-              </div>
-              <button type="button" className="big" onClick={runBuild}>
+              <div className="status alert">{build.message}</div>
+              <button type="button" className="button primary" onClick={runBuild}>
                 Try again
               </button>
             </div>
@@ -216,10 +234,11 @@ export function Stage({
         </div>
       )}
 
-      <footer className="foot">
-        <span>1 / 2 / 3 to pick · Backspace to undo</span>
-        {saveError ? <span className="warn">Not saved: {saveError}</span> : null}
-        {!saveError && inFlight > 0 ? <span>Saving…</span> : null}
+      <footer className="stage-foot">
+        <span>{finished ? "Backspace undoes the last pick." : "Press 1, 2 or 3 to pick. Backspace undoes."}</span>
+        {saveError ? <span className="alert">Not saved: {saveError}</span> : null}
+        {!saveError && inFlight > 0 ? <span>Saving</span> : null}
+        <span className="spacer" />
         <a href={`/talks/${talk.id}`}>Admin</a>
       </footer>
     </main>

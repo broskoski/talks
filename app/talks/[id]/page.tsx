@@ -4,7 +4,7 @@ import { AdminShell } from "@/components/AdminShell";
 import { deleteTalk, resetPicks, updateTalk } from "@/lib/actions";
 import { requireAuthOrRedirect } from "@/lib/auth";
 import { loadTalkWithTopics } from "@/lib/data";
-import { spent, topicMap } from "@/lib/talks";
+import { minutesSpent, topicMap } from "@/lib/talks";
 import { RoundsEditor } from "./RoundsEditor";
 
 export default async function TalkPage({ params }: PageProps<"/talks/[id]">) {
@@ -16,72 +16,88 @@ export default async function TalkPage({ params }: PageProps<"/talks/[id]">) {
   const map = topicMap(topics);
 
   return (
-    <AdminShell>
+    <AdminShell crumbs={[{ label: "Talks", href: "/" }, { label: talk.title }]}>
       <section className="section">
-        <div className="row">
+        <div className="title-row">
           <h1>{talk.title}</h1>
-          <span className={`status ${talk.status}`}>{talk.status}</span>
+          <span className={`badge ${talk.status}`}>{talk.status}</span>
           <span className="spacer" />
-          <Link href={`/talks/${talk.id}/stage`}>Open stage →</Link>
-          <a href={`https://www.are.na/${talk.ownerSlug}/${talk.slug}`} target="_blank" rel="noreferrer">
-            Channel on Are.na ↗
-          </a>
+          <div className="links">
+            <Link href={`/talks/${talk.id}/stage`}>Open stage</Link>
+            <a href={`https://www.are.na/${talk.ownerSlug}/${talk.slug}`} target="_blank" rel="noreferrer">
+              View on Are.na
+            </a>
+          </div>
         </div>
         <form action={updateTalk} className="row">
           <input type="hidden" name="talkId" value={talk.id} />
-          <input type="text" name="title" defaultValue={talk.title} required />
-          <label className="row">
-            Budget
-            <input type="number" name="budget" min={0} step="any" defaultValue={talk.budget} required />
+          <label className="field">
+            <span className="label">Name</span>
+            <input type="text" name="title" defaultValue={talk.title} className="input" required />
           </label>
-          <label className="row">
-            Status
-            <select name="status" defaultValue={talk.status}>
-              <option value="draft">draft</option>
-              <option value="live">live</option>
-              <option value="built">built</option>
+          <label className="field">
+            <span className="label">Length (minutes)</span>
+            <input type="number" name="minutes" min={0} step={1} defaultValue={talk.minutes} className="input short" required />
+          </label>
+          <label className="field">
+            <span className="label">Status</span>
+            <select name="status" defaultValue={talk.status} className="select">
+              <option value="draft">Draft</option>
+              <option value="live">Live</option>
+              <option value="built">Built</option>
             </select>
           </label>
-          <button type="submit">Save</button>
+          <label className="field">
+            <span className="label">&nbsp;</span>
+            <button type="submit" className="button">
+              Save changes
+            </button>
+          </label>
         </form>
       </section>
 
       <section className="section">
-        <h2>Rounds</h2>
+        <h2 className="section-header">Rounds</h2>
         <RoundsEditor talkId={talk.id} topics={topics} initialRounds={talk.rounds} />
       </section>
 
       <section className="section">
-        <h2>Picks</h2>
+        <h2 className="section-header">Picks</h2>
         {talk.picks.length === 0 ? (
-          <p className="muted">Nothing picked yet.</p>
+          <p className="sm slate">Nothing picked yet.</p>
         ) : (
-          <ol>
-            {talk.picks.map((pid, i) => (
-              <li key={i}>
-                {map.get(pid)?.title ?? `Channel ${pid}`} <span className="muted">(cost {map.get(pid)?.cost ?? 1})</span>
-              </li>
-            ))}
-          </ol>
+          <table>
+            <tbody>
+              {talk.picks.map((pid, i) => (
+                <tr key={i}>
+                  <td className="num slate" style={{ width: 40 }}>
+                    {i + 1}
+                  </td>
+                  <td className="primary">{map.get(pid)?.title ?? `Channel ${pid}`}</td>
+                  <td className="num">{map.get(pid)?.minutes ?? "?"} min</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
-        <p>
-          Spent {spent(talk.picks, map)} of {talk.budget}. Channel has {talk.blockCount} blocks
-          {talk.builtAt ? `, built ${talk.builtAt}` : ""}.
+        <p className="note">
+          {minutesSpent(talk.picks, map)} of {talk.minutes} minutes used. The channel holds {talk.blockCount} blocks
+          {talk.builtAt ? `, built ${new Date(talk.builtAt).toLocaleString()}` : ""}.
         </p>
-        <form action={resetPicks} className="row">
+        <form action={resetPicks} className="row" style={{ marginTop: "var(--space-3)" }}>
           <input type="hidden" name="talkId" value={talk.id} />
-          <button type="submit" className="secondary">
+          <button type="submit" className="button ghost">
             Reset picks
           </button>
-          <span className="muted">Clears picks only. Blocks already connected to the channel stay there.</span>
+          <span className="xs slate">Clears the picks only. Blocks already connected to the channel stay.</span>
         </form>
       </section>
 
       <section className="section">
-        <h2>Danger</h2>
+        <h2 className="section-header">Delete</h2>
         <form action={deleteTalk} className="row">
           <input type="hidden" name="talkId" value={talk.id} />
-          <button type="submit" className="danger">
+          <button type="submit" className="button alert">
             Delete talk and its channel
           </button>
         </form>
