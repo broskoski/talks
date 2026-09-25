@@ -1,69 +1,71 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { AdminShell } from "@/components/AdminShell";
+import { createTalk } from "@/lib/actions";
+import { requireAuthOrRedirect } from "@/lib/auth";
+import { loadTalksAndTopics } from "@/lib/data";
+import { topicMap, spent } from "@/lib/talks";
 
-export default function Home() {
+export default async function TalksPage() {
+  await requireAuthOrRedirect();
+  const { talks, topics } = await loadTalksAndTopics();
+  const map = topicMap(topics);
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <AdminShell>
+      <section className="section">
+        <h1>Talks</h1>
+        {talks.length === 0 ? (
+          <p className="muted">No talks yet.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th className="num">Budget</th>
+                <th className="num">Rounds</th>
+                <th className="num">Picks</th>
+                <th className="num">Blocks</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {talks.map((talk) => (
+                <tr key={talk.id}>
+                  <td>
+                    <Link href={`/talks/${talk.id}`}>{talk.title}</Link>
+                  </td>
+                  <td>
+                    <span className={`status ${talk.status}`}>{talk.status}</span>
+                  </td>
+                  <td className="num">
+                    {spent(talk.picks, map)} / {talk.budget}
+                  </td>
+                  <td className="num">{talk.rounds.length}</td>
+                  <td className="num">{talk.picks.length}</td>
+                  <td className="num">{talk.blockCount}</td>
+                  <td>
+                    <Link href={`/talks/${talk.id}/stage`}>Stage →</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="section">
+        <h2>New talk</h2>
+        <form action={createTalk} className="row">
+          <input type="text" name="title" placeholder="Talk name" required />
+          <label className="row">
+            Budget
+            <input type="number" name="budget" min={0} step="any" defaultValue={10} required />
+          </label>
+          <button type="submit">Create</button>
+        </form>
+        <p className="muted">Creates a private channel in the group. Building the talk fills that channel.</p>
+      </section>
+    </AdminShell>
   );
 }
