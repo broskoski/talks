@@ -12,7 +12,7 @@ export type Talk = {
   ownerSlug: string;
   /** Length of the talk in whole minutes. */
   minutes: number;
-  /** Each round is a list of 2 or 3 topic channel ids. */
+  /** Each round is a list of 1 to 3 topic channel ids. A round with one id is fixed: it is in the talk no matter what. */
   rounds: number[][];
   /** Picked topic channel ids, in pick order. One per round. */
   picks: number[];
@@ -144,6 +144,13 @@ export function newTalkMetadata(minutes: number): Metadata {
 }
 
 // --- Game logic -------------------------------------------------------------
+
+export const MAX_ROUND_SIZE = 3;
+
+/** A round with a single topic is pre-determined; the audience does not get a choice. */
+export function isFixedRound(round: number[]): boolean {
+  return round.length === 1;
+}
 
 export type TopicMap = Map<number, Topic>;
 

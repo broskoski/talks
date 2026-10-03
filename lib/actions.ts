@@ -10,6 +10,7 @@ import { loadTalksAndTopics } from "./data";
 import { env } from "./env";
 import { SESSION_COOKIE, createSessionToken, sessionCookieOptions } from "./session";
 import {
+  MAX_ROUND_SIZE,
   candidatesFor,
   channelTitleFor,
   newTalkMetadata,
@@ -106,7 +107,7 @@ export async function saveRounds(talkId: number, rounds: number[][]): Promise<vo
   const known = new Set(topics.map((t) => t.id));
   const clean = rounds.map((round) => round.map(Number).filter((id) => known.has(id)));
   for (const [i, round] of clean.entries()) {
-    if (round.length < 2 || round.length > 3) throw new Error(`Round ${i + 1} needs 2 or 3 topics`);
+    if (round.length < 1 || round.length > MAX_ROUND_SIZE) throw new Error(`Round ${i + 1} needs 1 to ${MAX_ROUND_SIZE} topics`);
     if (new Set(round).size !== round.length) throw new Error(`Round ${i + 1} repeats a topic`);
   }
   const talk = await loadTalkStrict(talkId);

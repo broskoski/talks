@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pick as pickAction, undo as undoAction, type PickResult } from "@/lib/actions";
-import { candidatesFor, isFinished, minutesLeft, minutesSpent, topicMap, type Talk, type Topic } from "@/lib/talks";
+import {
+  candidatesFor,
+  isFinished,
+  isFixedRound,
+  minutesLeft,
+  minutesSpent,
+  topicMap,
+  type Talk,
+  type Topic,
+} from "@/lib/talks";
 
 type BuildState =
   | { phase: "idle" }
@@ -50,6 +59,7 @@ export function Stage({
   }, []);
 
   const candidates = candidatesFor(talk, picks, map);
+  const fixed = isFixedRound(talk.rounds[picks.length] ?? []);
   const finished = isFinished(talk, picks, map);
   const remaining = Math.max(0, minutesLeft(talk, picks, map));
   const used = minutesSpent(picks, map);
@@ -78,6 +88,9 @@ export function Stage({
       if (e.key === "1" || e.key === "2" || e.key === "3") {
         e.preventDefault();
         doPick(Number(e.key) - 1);
+      } else if (fixed && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        doPick(0);
       } else if (e.key === "Backspace") {
         e.preventDefault();
         doUndo();
@@ -85,7 +98,7 @@ export function Stage({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [doPick, doUndo]);
+  }, [doPick, doUndo, fixed]);
 
   async function runBuild() {
     setBuild({ phase: "running", total: 0, done: 0 });
@@ -145,7 +158,7 @@ export function Stage({
       ) : null}
 
       {!finished ? (
-        <div className="cards" style={{ "--cols": candidates.length } as React.CSSProperties}>
+        <div className={fixed ? "cards fixed" : "cards"} style={{ "--cols": candidates.length } as React.CSSProperties}>
           {candidates.map((c, i) => (
             <button
               key={`${picks.length}-${c.topic.id}`}
@@ -154,7 +167,7 @@ export function Stage({
               disabled={!c.available}
               onClick={() => doPick(i)}
             >
-              <span className="badge key">{i + 1}</span>
+              <span className="badge key">{fixed ? "Fixed" : i + 1}</span>
               <span className="name">{c.topic.title}</span>
               {c.topic.description ? <span className="subtitle">{c.topic.description}</span> : null}
               <span className="meta">
@@ -235,7 +248,13 @@ export function Stage({
       )}
 
       <footer className="stage-foot">
-        <span>{finished ? "Backspace undoes the last pick." : "Press 1, 2 or 3 to pick. Backspace undoes."}</span>
+        <span>
+          {finished
+            ? "Backspace undoes the last pick."
+            : fixed
+              ? "This one is fixed. Press Enter to continue. Backspace undoes."
+              : "Press 1, 2 or 3 to pick. Backspace undoes."}
+        </span>
         {saveError ? <span className="alert">Not saved: {saveError}</span> : null}
         {!saveError && inFlight > 0 ? <span>Saving</span> : null}
         <span className="spacer" />

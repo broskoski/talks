@@ -25,6 +25,6 @@ and building the talk fills that channel with every block from the picked topic 
 
 ## Metadata on Are.na
 
-Talk channel: `talk: true`, `minutes` (talk length), `rounds` (JSON array of arrays of channel ids),
+Talk channel: `talk: true`, `minutes` (talk length), `rounds` (JSON array of arrays of channel ids; a one-id round is fixed and skips the vote),
 `picks` (JSON array of channel ids), `status` (`draft` | `live` | `built`), `built_at`.
 Topic channel: `minutes` (presenting time; when missing, estimated as 20 seconds a block, at least 1).

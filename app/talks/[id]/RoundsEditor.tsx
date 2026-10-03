@@ -2,9 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { saveRounds } from "@/lib/actions";
-import type { Topic } from "@/lib/talks";
+import { MAX_ROUND_SIZE, isFixedRound, type Topic } from "@/lib/talks";
 
-const SLOTS = 3;
+const SLOTS = MAX_ROUND_SIZE;
+
+function chosen(round: number[]): number[] {
+  return round.filter((id) => id > 0);
+}
 
 function pad(round: number[]): number[] {
   const out = round.slice(0, SLOTS);
@@ -49,7 +53,7 @@ export function RoundsEditor({
   }
 
   function save() {
-    const clean = rounds.map((r) => r.filter((id) => id > 0));
+    const clean = rounds.map(chosen);
     startTransition(async () => {
       try {
         await saveRounds(talkId, clean);
@@ -64,10 +68,13 @@ export function RoundsEditor({
     <div>
       {rounds.map((round, ri) => (
         <div className="round" key={ri}>
-          <span className="round-label">Round {ri + 1}</span>
+          <span className="round-label">
+            Round {ri + 1}
+            {isFixedRound(chosen(round)) ? <span className="badge" style={{ marginLeft: "0.5em" }}>Fixed</span> : null}
+          </span>
           {round.map((value, si) => (
             <select key={si} value={value} className="select" onChange={(e) => update(ri, si, Number(e.target.value))}>
-              <option value={0}>{si < 2 ? "— choose —" : "— none —"}</option>
+              <option value={0}>{si === 0 ? "— choose —" : "— none —"}</option>
               {topics.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title} ({t.minutes} min, {t.blockCount} blocks)
@@ -97,7 +104,10 @@ export function RoundsEditor({
         </button>
         {message ? <span className={message === "Saved." ? "sm slate" : "sm alert"}>{message}</span> : null}
       </div>
-      <p className="note">Each round offers 2 or 3 topics. Saving clears any picks that no longer fit the rounds.</p>
+      <p className="note">
+        Each round offers 2 or 3 topics for the audience to pick from. A round with a single topic is fixed: it goes in
+        the talk without a vote. Saving clears any picks that no longer fit the rounds.
+      </p>
     </div>
   );
 }

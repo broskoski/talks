@@ -607,6 +607,11 @@ td .input {
   cursor: pointer;
 }
 
+/* A fixed round shows one card; keep it the same size as the others would be. */
+.cards.fixed .channel {
+  max-width: min(60vh, 32vw);
+}
+
 .channel:hover:not(:disabled) {
   border-color: var(--color-channel-private-3);
 }
