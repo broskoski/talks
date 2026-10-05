@@ -38,7 +38,7 @@ export function titleSlide(title: string, date: Date): string {
 
 /** Marks the start of one picked channel's blocks. */
 export function sectionSlide(title: string): string {
-  return `# ${title}`;
+  return `### ${title}`;
 }
 
 export function endSlide(channelUrl: string): string {
