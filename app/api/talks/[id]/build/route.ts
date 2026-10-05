@@ -190,7 +190,7 @@ export async function POST(_req: NextRequest, ctx: RouteContext<"/api/talks/[id]
     if (finished) {
       const list = talk.picks.map((p, i) => `${i + 1}. ${map.get(p)?.title ?? `Channel ${p}`}`).join("\n");
       await updateChannel(id, {
-        description: `Assembled live from the audience's picks:\n\n${list}`,
+        description: `Topic selections:\n\n${list}`,
         metadata: { status: "built", built_at: new Date().toISOString() },
       });
     }
