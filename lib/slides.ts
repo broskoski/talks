@@ -10,12 +10,30 @@ export const SLIDE_KEY = "talks_slide";
 export const SECTION_KEY = "talks_section";
 export type SlideKind = "title" | "section" | "end";
 
+/** Talks happen in New York time; the server runs in UTC. */
+const TALK_TIME_ZONE = "America/New_York";
+
+/** "October 5th, 2026" */
 export function formatTalkDate(date: Date): string {
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TALK_TIME_ZONE,
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const day = Number(get("day"));
+  const mod100 = day % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? "th" : (["th", "st", "nd", "rd"][day % 10] ?? "th");
+  return `${get("month")} ${day}${suffix}, ${get("year")}`;
 }
 
+/**
+ * Title, a rule, then presenter / date / email as one paragraph. Are.na renders
+ * single newlines inside a paragraph as line breaks, so no blank lines between them.
+ */
 export function titleSlide(title: string, date: Date): string {
-  return [`# ${title}`, "", `## ${formatTalkDate(date)}`, "", `${PRESENTER_NAME}  `, PRESENTER_EMAIL].join("\n");
+  return [`# ${title}`, "---", PRESENTER_NAME, formatTalkDate(date), PRESENTER_EMAIL].join("\n");
 }
 
 /** Marks the start of one picked channel's blocks. */
