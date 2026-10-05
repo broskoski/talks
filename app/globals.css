@@ -742,9 +742,48 @@ td .input {
   color: var(--color-foreground);
 }
 
-/* Build progress: the block being connected right now, and the ones just before it. */
-.summary .build-label {
-  font-size: 0.9em;
+/* Build screen: replaces the voting UI while blocks are connected to the talk channel. */
+.build {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.build-figures {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+
+.build-figures .count {
+  font-size: 4em;
+  font-weight: bold;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.build-figures .of {
+  font-size: 0.45em;
+  font-weight: normal;
+  color: var(--color-slate);
+}
+
+.build-figures .section {
+  font-size: 1.75em;
+  font-weight: bold;
+  line-height: 1.1;
+  color: var(--color-slate);
+}
+
+.progress.big {
+  height: 1.2em;
+}
+
+.build-label {
+  font-size: 1.1em;
   color: var(--color-slate);
   min-height: 1.4em;
   white-space: nowrap;
@@ -752,19 +791,35 @@ td .input {
   text-overflow: ellipsis;
 }
 
-.build-thumbs {
-  display: flex;
-  gap: 6px;
+.build-label a {
+  font-weight: bold;
+  color: var(--color-foreground);
+}
+
+.build-label.alert {
+  color: var(--color-alert);
+}
+
+/* Newest block first; the grid fills in as the channel does. */
+.build-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6em, 1fr));
+  gap: 8px;
+  align-content: start;
   overflow: hidden;
 }
 
-.build-thumbs img {
-  width: 3.4em;
+.build-grid img {
+  width: 100%;
   aspect-ratio: 1;
-  flex: none;
   object-fit: cover;
   background: var(--color-gray1);
   border-radius: var(--radius-1);
+}
+
+.build-grid img:first-child {
+  outline: 2px solid var(--color-foreground);
+  outline-offset: 2px;
 }
 
 .stage-foot {

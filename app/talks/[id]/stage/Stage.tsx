@@ -22,17 +22,9 @@ type BuildState =
   | { phase: "finished"; total: number; channelUrl: string }
   | { phase: "error"; message: string };
 
-const RECENT_THUMBS = 14;
+const RECENT_THUMBS = 60;
 
-export function Stage({
-  talk,
-  topics,
-  thumbs,
-}: {
-  talk: Talk;
-  topics: Topic[];
-  thumbs: Record<number, string[]>;
-}) {
+export function Stage({ talk, topics, thumbs }: { talk: Talk; topics: Topic[]; thumbs: Record<number, string[]> }) {
   const map = topicMap(topics);
   const [picks, setPicks] = useState<number[]>(talk.picks);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -157,7 +149,15 @@ export function Stage({
         <div className="crumbs">
           <span className="current">{talk.title}</span>
           <span className="sep" />
-          <span className="sub">{finished ? "Done" : `Round ${roundNumber} of ${talk.rounds.length}`}</span>
+          <span className="sub">
+            {build.phase === "running"
+              ? "Building"
+              : build.phase === "finished"
+                ? "Built"
+                : finished
+                  ? "Done"
+                  : `Round ${roundNumber} of ${talk.rounds.length}`}
+          </span>
         </div>
         <span className="spacer" />
         <div className="figures">
@@ -178,141 +178,202 @@ export function Stage({
         </div>
       </header>
 
-      <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={talk.minutes} aria-valuenow={used}>
-        <div style={{ transform: `scaleX(${fraction})` }} />
-      </div>
-
-      {(picks.length > 0 || fixedAhead.length > 0) && !finished ? (
-        <div className="picked">
-          {picks.map((id, i) => (
-            <span key={i} className="badge outline">
-              {map.get(id)?.title ?? id}
-            </span>
-          ))}
-          {fixedAhead.map((id) => (
-            <span key={`fixed-${id}`} className="badge outline fixed" title="Fixed: in the talk regardless of the vote">
-              {map.get(id)?.title ?? id}
-              <small>fixed</small>
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      {!finished ? (
-        <div className={fixed ? "cards fixed" : "cards"} style={{ "--cols": candidates.length } as React.CSSProperties}>
-          {candidates.map((c, i) => (
-            <button
-              key={`${picks.length}-${c.topic.id}`}
-              type="button"
-              className="channel"
-              disabled={!c.available}
-              onClick={() => doPick(i)}
-            >
-              <span className="badge key">{fixed ? "Fixed" : i + 1}</span>
-              <span className="name">{c.topic.title}</span>
-              {c.topic.description ? <span className="subtitle">{c.topic.description}</span> : null}
-              <span className="meta">
-                <b>{c.topic.minutes} min</b>
-                {c.topic.blockCount} blocks
+      {build.phase !== "idle" ? (
+        <section className="build">
+          <div className="picked">
+            {picks.map((id, i) => (
+              <span key={i} className="badge outline">
+                {map.get(id)?.title ?? id}
               </span>
-              {c.reason === "over_time" ? (
-                <span className="why">
-                  {reserved > 0
-                    ? `Only ${Math.max(0, remaining - reserved)} min left after the fixed ${reserved}`
-                    : `Only ${remaining} min left`}
-                </span>
-              ) : null}
-              {c.reason === "already_picked" ? <span className="why">Already in the talk</span> : null}
-              {thumbs[c.topic.id]?.length ? (
-                <span className="thumbs">
-                  {thumbs[c.topic.id].map((src) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={src} src={src} alt="" />
-                  ))}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="summary">
-          {picks.length === 0 ? (
-            <p>Nothing fits the time left. Check the rounds and minutes in the admin.</p>
-          ) : (
-            <table>
-              <tbody>
-                {picks.map((id, i) => (
-                  <tr key={i}>
-                    <td className="num slate" style={{ width: "2.5em" }}>
-                      {i + 1}
-                    </td>
-                    <td>
-                      <b>{map.get(id)?.title ?? id}</b>
-                      {map.get(id)?.description ? <span className="subtitle">{map.get(id)?.description}</span> : null}
-                    </td>
-                    <td className="num slate">{map.get(id)?.minutes ?? "?"} min</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {picks.length > 0 ? (
-            <p className="slate num">
-              {used} of {talk.minutes} minutes.
-            </p>
-          ) : null}
+            ))}
+          </div>
 
-          {build.phase === "idle" && picks.length > 0 ? (
-            <button type="button" className="button primary" onClick={runBuild} disabled={inFlight > 0}>
-              {inFlight > 0 ? "Saving" : "Build the talk"}
-            </button>
-          ) : null}
-          {build.phase === "running" ? (
-            <div className="stack">
-              <div className="progress">
-                <div style={{ transform: `scaleX(${build.total ? build.done / build.total : 0})` }} />
-              </div>
-              <div className="status num">
-                {build.done} of {build.total || "?"}
-                {build.section ? <span className="slate"> · {build.section}</span> : null}
-              </div>
-              <div className="status build-label">{build.label}</div>
-              {build.thumbs.length ? (
-                <div className="build-thumbs">
-                  {build.thumbs.map((src) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={src} src={src} alt="" />
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          <div className="build-figures num">
+            <span className="count">
+              {build.phase === "running" ? build.done : build.phase === "finished" ? build.total : "—"}
+              <span className="of">
+                {" "}
+                / {build.phase === "running" ? build.total || "?" : build.phase === "finished" ? build.total : "?"}
+              </span>
+            </span>
+            <span className="section">
+              {build.phase === "running" ? (build.section ?? build.label) : null}
+              {build.phase === "finished" ? "Built" : null}
+              {build.phase === "error" ? "Stopped" : null}
+            </span>
+          </div>
+
+          <div
+            className="progress big"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={build.phase === "error" ? 1 : build.total}
+            aria-valuenow={build.phase === "running" ? build.done : build.phase === "finished" ? build.total : 0}
+          >
+            <div
+              style={{
+                transform: `scaleX(${
+                  build.phase === "running"
+                    ? build.total
+                      ? build.done / build.total
+                      : 0
+                    : build.phase === "finished"
+                      ? 1
+                      : 0
+                })`,
+              }}
+            />
+          </div>
+
+          {build.phase === "running" ? <div className="build-label">{build.label}</div> : null}
           {build.phase === "finished" ? (
-            <div className="status">
-              Built with {build.total} blocks.{" "}
+            <div className="build-label">
+              {build.total} blocks.{" "}
               <a href={build.channelUrl} target="_blank" rel="noreferrer">
                 Open the channel
               </a>
             </div>
           ) : null}
           {build.phase === "error" ? (
-            <div className="stack">
-              <div className="status alert">{build.message}</div>
+            <div className="row">
+              <span className="build-label alert">{build.message}</span>
               <button type="button" className="button primary" onClick={runBuild}>
                 Try again
               </button>
             </div>
           ) : null}
-        </div>
+
+          {build.phase === "running" && build.thumbs.length ? (
+            <div className="build-grid">
+              {build.thumbs.map((src) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={src} src={src} alt="" />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : (
+        <>
+          <div
+            className="progress"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={talk.minutes}
+            aria-valuenow={used}
+          >
+            <div style={{ transform: `scaleX(${fraction})` }} />
+          </div>
+
+          {(picks.length > 0 || fixedAhead.length > 0) && !finished ? (
+            <div className="picked">
+              {picks.map((id, i) => (
+                <span key={i} className="badge outline">
+                  {map.get(id)?.title ?? id}
+                </span>
+              ))}
+              {fixedAhead.map((id) => (
+                <span
+                  key={`fixed-${id}`}
+                  className="badge outline fixed"
+                  title="Fixed: in the talk regardless of the vote"
+                >
+                  {map.get(id)?.title ?? id}
+                  <small>fixed</small>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {!finished ? (
+            <div
+              className={fixed ? "cards fixed" : "cards"}
+              style={{ "--cols": candidates.length } as React.CSSProperties}
+            >
+              {candidates.map((c, i) => (
+                <button
+                  key={`${picks.length}-${c.topic.id}`}
+                  type="button"
+                  className="channel"
+                  disabled={!c.available}
+                  onClick={() => doPick(i)}
+                >
+                  <span className="badge key">{fixed ? "Fixed" : i + 1}</span>
+                  <span className="name">{c.topic.title}</span>
+                  {c.topic.description ? <span className="subtitle">{c.topic.description}</span> : null}
+                  <span className="meta">
+                    <b>{c.topic.minutes} min</b>
+                    {c.topic.blockCount} blocks
+                  </span>
+                  {c.reason === "over_time" ? (
+                    <span className="why">
+                      {reserved > 0
+                        ? `Only ${Math.max(0, remaining - reserved)} min left after the fixed ${reserved}`
+                        : `Only ${remaining} min left`}
+                    </span>
+                  ) : null}
+                  {c.reason === "already_picked" ? <span className="why">Already in the talk</span> : null}
+                  {thumbs[c.topic.id]?.length ? (
+                    <span className="thumbs">
+                      {thumbs[c.topic.id].map((src) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={src} src={src} alt="" />
+                      ))}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="summary">
+              {picks.length === 0 ? (
+                <p>Nothing fits the time left. Check the rounds and minutes in the admin.</p>
+              ) : (
+                <table>
+                  <tbody>
+                    {picks.map((id, i) => (
+                      <tr key={i}>
+                        <td className="num slate" style={{ width: "2.5em" }}>
+                          {i + 1}
+                        </td>
+                        <td>
+                          <b>{map.get(id)?.title ?? id}</b>
+                          {map.get(id)?.description ? (
+                            <span className="subtitle">{map.get(id)?.description}</span>
+                          ) : null}
+                        </td>
+                        <td className="num slate">{map.get(id)?.minutes ?? "?"} min</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {picks.length > 0 ? (
+                <p className="slate num">
+                  {used} of {talk.minutes} minutes.
+                </p>
+              ) : null}
+
+              {picks.length > 0 ? (
+                <button type="button" className="button primary" onClick={runBuild} disabled={inFlight > 0}>
+                  {inFlight > 0 ? "Saving" : "Build the talk"}
+                </button>
+              ) : null}
+            </div>
+          )}
+        </>
       )}
 
       <footer className="stage-foot">
         <span>
-          {finished
-            ? "Backspace undoes the last pick."
-            : fixed
-              ? "This one is fixed. Press Enter to continue. Backspace undoes."
-              : "Press 1, 2 or 3 to pick. Backspace undoes."}
+          {building
+            ? build.phase === "finished"
+              ? "The talk is on Are.na."
+              : "Connecting blocks to the talk channel."
+            : finished
+              ? "Backspace undoes the last pick."
+              : fixed
+                ? "This one is fixed. Press Enter to continue. Backspace undoes."
+                : "Press 1, 2 or 3 to pick. Backspace undoes."}
         </span>
         {saveError ? <span className="alert">Not saved: {saveError}</span> : null}
         {!saveError && inFlight > 0 ? <span>Saving</span> : null}
