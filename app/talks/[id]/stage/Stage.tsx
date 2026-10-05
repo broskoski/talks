@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pick as pickAction, undo as undoAction, type PickResult } from "@/lib/actions";
+import { readEvents, type BuildEvent } from "@/lib/build";
 import {
   candidatesFor,
   isFinished,
@@ -15,9 +16,11 @@ import {
 
 type BuildState =
   | { phase: "idle" }
-  | { phase: "running"; total: number; done: number }
+  | { phase: "running"; total: number; done: number; label: string; section: string | null; thumbs: string[] }
   | { phase: "finished"; total: number; channelUrl: string }
   | { phase: "error"; message: string };
+
+const RECENT_THUMBS = 14;
 
 export function Stage({
   talk,
@@ -101,17 +104,40 @@ export function Stage({
   }, [doPick, doUndo, fixed]);
 
   async function runBuild() {
-    setBuild({ phase: "running", total: 0, done: 0 });
+    setBuild({ phase: "running", total: 0, done: 0, label: "Starting", section: null, thumbs: [] });
     try {
+      // Each request connects a bounded batch and streams progress; loop until the server says finished.
       for (;;) {
         const res = await fetch(`/api/talks/${talk.id}/build`, { method: "POST" });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? `Build failed (${res.status})`);
-        if (body.finished) {
-          setBuild({ phase: "finished", total: body.total, channelUrl: body.channelUrl });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `Build failed (${res.status})`);
+        }
+        let result: Extract<BuildEvent, { type: "result" }> | null = null;
+        for await (const event of readEvents(res)) {
+          if (event.type === "error") throw new Error(event.message);
+          if (event.type === "result") {
+            result = event;
+            break;
+          }
+          setBuild((prev) => ({
+            phase: "running",
+            total: event.total,
+            done: event.done,
+            label: event.label,
+            section: event.section,
+            thumbs: event.thumb
+              ? [event.thumb, ...(prev.phase === "running" ? prev.thumbs : [])].slice(0, RECENT_THUMBS)
+              : prev.phase === "running"
+                ? prev.thumbs
+                : [],
+          }));
+        }
+        if (!result) throw new Error("The build stopped without finishing");
+        if (result.finished) {
+          setBuild({ phase: "finished", total: result.total, channelUrl: result.channelUrl });
           return;
         }
-        setBuild({ phase: "running", total: body.total, done: body.done });
       }
     } catch (err) {
       setBuild({ phase: "error", message: err instanceof Error ? err.message : "Build failed" });
@@ -224,8 +250,18 @@ export function Stage({
                 <div style={{ transform: `scaleX(${build.total ? build.done / build.total : 0})` }} />
               </div>
               <div className="status num">
-                Connecting blocks, {build.done} of {build.total || "?"}
+                {build.done} of {build.total || "?"}
+                {build.section ? <span className="slate"> · {build.section}</span> : null}
               </div>
+              <div className="status build-label">{build.label}</div>
+              {build.thumbs.length ? (
+                <div className="build-thumbs">
+                  {build.thumbs.map((src) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={src} src={src} alt="" />
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
           {build.phase === "finished" ? (

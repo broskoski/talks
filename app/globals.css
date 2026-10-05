@@ -722,6 +722,31 @@ td .input {
   color: var(--color-foreground);
 }
 
+/* Build progress: the block being connected right now, and the ones just before it. */
+.summary .build-label {
+  font-size: 0.9em;
+  color: var(--color-slate);
+  min-height: 1.4em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.build-thumbs {
+  display: flex;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.build-thumbs img {
+  width: 3.4em;
+  aspect-ratio: 1;
+  flex: none;
+  object-fit: cover;
+  background: var(--color-gray1);
+  border-radius: var(--radius-1);
+}
+
 .stage-foot {
   display: flex;
   align-items: baseline;
