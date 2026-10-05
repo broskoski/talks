@@ -170,6 +170,19 @@ export function minutesLeft(talk: Pick<Talk, "minutes">, picks: number[], topics
   return talk.minutes - minutesSpent(picks, topics);
 }
 
+/** Topic ids of fixed rounds that have not been reached yet, in round order. */
+export function upcomingFixed(talk: Pick<Talk, "rounds">, picks: number[]): number[] {
+  return talk.rounds
+    .slice(picks.length + 1)
+    .filter(isFixedRound)
+    .map((round) => round[0]);
+}
+
+/** Minutes set aside for fixed rounds still to come, so a vote cannot leave them without time. */
+export function minutesReserved(talk: Pick<Talk, "rounds">, picks: number[], topics: TopicMap): number {
+  return upcomingFixed(talk, picks).reduce((sum, id) => sum + minutesOf(topics, id), 0);
+}
+
 export type Candidate = {
   topic: Topic;
   /** False when the topic does not fit the remaining time or was already picked. */
@@ -184,7 +197,7 @@ export function candidatesFor(
 ): Candidate[] {
   const round = talk.rounds[picks.length];
   if (!round) return [];
-  const remaining = minutesLeft(talk, picks, topics);
+  const remaining = minutesLeft(talk, picks, topics) - minutesReserved(talk, picks, topics);
   return round.map((id) => {
     const topic = topics.get(id);
     if (!topic) {
@@ -227,6 +240,9 @@ export function validatePicks(talk: Pick<Talk, "minutes" | "rounds">, picks: num
     seen.add(id);
     remaining -= minutesOf(topics, id);
     if (remaining < 0) return `Pick ${i + 1} runs over the talk length`;
+    if (remaining < minutesReserved(talk, picks.slice(0, i), topics)) {
+      return `Pick ${i + 1} leaves no time for a fixed round`;
+    }
   }
   return null;
 }

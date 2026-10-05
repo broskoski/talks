@@ -8,8 +8,10 @@ import {
   isFinished,
   isFixedRound,
   minutesLeft,
+  minutesReserved,
   minutesSpent,
   topicMap,
+  upcomingFixed,
   type Talk,
   type Topic,
 } from "@/lib/talks";
@@ -66,6 +68,8 @@ export function Stage({
   const finished = isFinished(talk, picks, map);
   const remaining = Math.max(0, minutesLeft(talk, picks, map));
   const used = minutesSpent(picks, map);
+  const fixedAhead = upcomingFixed(talk, picks);
+  const reserved = minutesReserved(talk, picks, map);
   const building = build.phase === "running" || build.phase === "finished";
 
   const doPick = useCallback(
@@ -163,6 +167,11 @@ export function Stage({
           <span>
             <b>{remaining} min</b> left
           </span>
+          {reserved > 0 ? (
+            <span>
+              <b>{reserved} min</b> fixed
+            </span>
+          ) : null}
           <span>
             <b>{talk.minutes} min</b> talk
           </span>
@@ -173,11 +182,17 @@ export function Stage({
         <div style={{ transform: `scaleX(${fraction})` }} />
       </div>
 
-      {picks.length > 0 && !finished ? (
+      {(picks.length > 0 || fixedAhead.length > 0) && !finished ? (
         <div className="picked">
           {picks.map((id, i) => (
             <span key={i} className="badge outline">
               {map.get(id)?.title ?? id}
+            </span>
+          ))}
+          {fixedAhead.map((id) => (
+            <span key={`fixed-${id}`} className="badge outline fixed" title="Fixed: in the talk regardless of the vote">
+              {map.get(id)?.title ?? id}
+              <small>fixed</small>
             </span>
           ))}
         </div>

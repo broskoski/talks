@@ -579,6 +579,19 @@ td .input {
   padding: 0 0.6em;
 }
 
+/* A fixed topic still to come: shown alongside the picks so the room knows it is in. */
+.stage .badge.fixed {
+  border-style: dashed;
+  color: var(--color-slate);
+  gap: 0.5em;
+}
+
+.stage .badge.fixed small {
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .cards {
   flex: 1;
   display: grid;
