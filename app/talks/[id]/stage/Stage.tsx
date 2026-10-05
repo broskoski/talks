@@ -215,6 +215,14 @@ export function Stage({
                 <b>{c.topic.minutes} min</b>
                 {c.topic.blockCount} blocks
               </span>
+              {c.reason === "over_time" ? (
+                <span className="why">
+                  {reserved > 0
+                    ? `Only ${Math.max(0, remaining - reserved)} min left after the fixed ${reserved}`
+                    : `Only ${remaining} min left`}
+                </span>
+              ) : null}
+              {c.reason === "already_picked" ? <span className="why">Already in the talk</span> : null}
               {thumbs[c.topic.id]?.length ? (
                 <span className="thumbs">
                   {thumbs[c.topic.id].map((src) => (

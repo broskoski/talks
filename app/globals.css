@@ -684,6 +684,13 @@ td .input {
   display: block;
 }
 
+/* Why a card cannot be picked. */
+.channel .why {
+  font-size: 0.7em;
+  line-height: 1.35;
+  color: var(--color-alert, #c0392b);
+}
+
 .channel .thumbs {
   display: flex;
   justify-content: center;
