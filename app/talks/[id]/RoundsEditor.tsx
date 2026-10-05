@@ -64,6 +64,20 @@ export function RoundsEditor({
     });
   }
 
+  // A topic can appear in only one round, so hide it everywhere else once chosen.
+  const used = new Set(rounds.flatMap(chosen));
+  function optionsFor(current: number): Topic[] {
+    return topics.filter((t) => t.id === current || !used.has(t.id));
+  }
+
+  function renderOptions(list: Topic[]) {
+    return list.map((t) => (
+      <option key={t.id} value={t.id}>
+        {t.title} ({t.minutes} min, {t.blockCount} blocks)
+      </option>
+    ));
+  }
+
   return (
     <div>
       {rounds.map((round, ri) => (
@@ -75,11 +89,12 @@ export function RoundsEditor({
           {round.map((value, si) => (
             <select key={si} value={value} className="select" onChange={(e) => update(ri, si, Number(e.target.value))}>
               <option value={0}>{si === 0 ? "— choose —" : "— none —"}</option>
-              {topics.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title} ({t.minutes} min, {t.blockCount} blocks)
-                </option>
-              ))}
+              {renderOptions(optionsFor(value).filter((t) => t.blockCount > 0))}
+              {optionsFor(value).some((t) => t.blockCount === 0) ? (
+                <optgroup label="Empty channels">
+                  {renderOptions(optionsFor(value).filter((t) => t.blockCount === 0))}
+                </optgroup>
+              ) : null}
             </select>
           ))}
           <div className="actions">
